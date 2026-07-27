@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="id">
+<link rel="stylesheet" href="../gateway.css">      <!-- di gateway -->
+<link rel="stylesheet" href="../dome-network.css"> <!-- di dome-network -->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DOMENET — SECURE ACCESS</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+:root {
+  --bg:     #010a01;
+  --green:  #00ff41;
+  --dgreen: #00a828;
+  --dim:    #004410;
+  --cyan:   #00ffff;
+  --yellow: #ffff00;
+  --red:    #ff2222;
+  --orange: #ff8c00;
+  --text:   #b0ffb0;
+  --muted:  #2a6a2a;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  background: var(--bg);
+  font-family: 'Share Tech Mono', monospace;
+  color: var(--green);
+  overflow: hidden;
+}
+
+/* ── CRT scanlines ── */
+body::after {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent, transparent 2px,
+    rgba(0,255,65,.018) 2px, rgba(0,255,65,.018) 4px
+  );
+}
+/* ── vignette ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none; z-index: 9998;
+  background: radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0,0,0,.75) 100%);
+}
+
+/* ══════════════ CANVAS BG ══════════════ */
+#bg-canvas {
+  position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0;
+}
+
+/* ══════════════ GLITCH OVERLAY ══════════════ */
+#glitch-overlay {
+  position: fixed; inset: 0; z-index: 5; pointer-events: none;
+  overflow: hidden; opacity: 0;
+}
+.glitch-bar {
+  position: absolute; left: 0; width: 100%;
+  background: rgba(0,255,65,.06);
+  animation: none;
+}
+
+/* ══════════════ WRAPPER ══════════════ */
+#wrapper {
+  position: relative; z-index: 10;
+  width: 100%; height: 100vh;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 0;
+}
+
+/* ══════════════ TOP TICKER ══════════════ */
+#ticker-bar {
+  position: fixed; top: 0; left: 0; right: 0; height: 26px;
+  background: rgba(0,10,0,.9);
+  border-bottom: 1px solid var(--dim);
+  display: flex; align-items: center;
+  overflow: hidden; z-index: 20;
+  font-size: .58rem; letter-spacing: 1px; color: var(--muted);
+}
+#ticker-track {
+  display: flex; white-space: nowrap;
+  animation: tickerScroll 28s linear infinite;
+}
+#ticker-track span { margin-right: 60px; }
+#ticker-track span.g { color: var(--dgreen); }
+#ticker-track span.r { color: var(--red); }
+#ticker-track span.c { color: var(--cyan); }
+#ticker-track span.y { color: var(--yellow); }
+@keyframes tickerScroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+/* ══════════════ CORNER BRACKETS ══════════════ */
+.corner {
+  position: fixed; width: 40px; height: 40px;
+  z-index: 15; pointer-events: none;
+  opacity: .5;
+}
+.corner svg { width: 100%; height: 100%; }
+.corner.tl { top: 34px; left: 10px; }
+.corner.tr { top: 34px; right: 10px; transform: scaleX(-1); }
+.corner.bl { bottom: 34px; left: 10px; transform: scaleY(-1); }
+.corner.br { bottom: 34px; right: 10px; transform: scale(-1,-1); }
+
+/* ══════════════ BOTTOM STATUS BAR ══════════════ */
+#status-bar {
+  position: fixed; bottom: 0; left: 0; right: 0; height: 26px;
+  background: rgba(0,10,0,.9);
+  border-top: 1px solid var(--dim);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 14px; font-size: .58rem; color: var(--muted);
+  z-index: 20;
+}
+#status-bar .seg { display: flex; gap: 16px; }
+.sb-item { display: flex; align-items: center; gap: 5px; }
+.sb-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--dgreen); box-shadow: 0 0 5px var(--dgreen); }
+.sb-dot.r { background: var(--red); box-shadow: 0 0 5px var(--red); }
+.sb-dot.y { background: var(--yellow); box-shadow: 0 0 5px var(--yellow); }
+#sb-time { color: var(--dgreen); letter-spacing: 2px; }
+
+/* ══════════════ GLOBE RING ══════════════ */
+#globe-ring {
+  position: relative;
+  width: 320px; height: 320px;
+  margin-bottom: -10px;
+}
+#globe-canvas { width: 320px; height: 320px; display: block; }
+
+/* ══════════════ MAIN CARD ══════════════ */
+#card {
+  position: relative;
+  width: min(680px, 94vw);
+  padding: 36px 42px 32px;
+  background: rgba(0,8,0,.88);
+  border: 1px solid var(--dim);
+  border-radius: 2px;
+  display: flex; flex-direction: column; align-items: center; gap: 22px;
+}
+/* glowing top edge */
+#card::before {
+  content: '';
+  position: absolute; top: 0; left: 10%; right: 10%; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--dgreen), var(--cyan), var(--dgreen), transparent);
+  box-shadow: 0 0 14px var(--dgreen);
+}
+/* glowing bottom edge */
+#card::after {
+  content: '';
+  position: absolute; bottom: 0; left: 20%; right: 20%; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--dim), transparent);
+}
+
+/* card corner decorations */
+.card-corner {
+  position: absolute; width: 12px; height: 12px;
+  border-color: var(--dgreen); border-style: solid;
+}
+.card-corner.tl { top: -1px; left: -1px; border-width: 1px 0 0 1px; }
+.card-corner.tr { top: -1px; right: -1px; border-width: 1px 1px 0 0; }
+.card-corner.bl { bottom: -1px; left: -1px; border-width: 0 0 1px 1px; }
+.card-corner.br { bottom: -1px; right: -1px; border-width: 0 1px 1px 0; }
+
+/* ══════════════ LOGO ══════════════ */
+#logo {
+  font-family: 'Orbitron', monospace;
+  font-size: clamp(1.6rem, 5vw, 2.6rem);
+  font-weight: 900;
+  letter-spacing: 8px;
+  color: var(--green);
+  text-shadow: 0 0 18px var(--green), 0 0 40px rgba(0,255,65,.3);
+  text-align: center;
+  animation: logoPulse 3s ease-in-out infinite;
+}
+#logo span { color: var(--cyan); text-shadow: 0 0 18px var(--cyan); }
+@keyframes logoPulse {
+  0%,100% { text-shadow: 0 0 18px var(--green), 0 0 40px rgba(0,255,65,.3); }
+  50%      { text-shadow: 0 0 28px var(--green), 0 0 60px rgba(0,255,65,.5), 0 0 2px #fff; }
+}
+
+#logo-sub {
+  font-size: .62rem; letter-spacing: 6px; color: var(--muted);
+  text-transform: uppercase; margin-top: -14px;
+}
+
+/* ══════════════ DIVIDER ══════════════ */
+.divider {
+  width: 100%; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--dim) 30%, var(--dim) 70%, transparent);
+  position: relative;
+}
+.divider::before {
+  content: '◆';
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  color: var(--dgreen); font-size: .55rem;
+  background: rgba(0,8,0,.88); padding: 0 8px;
+}
+
+/* ══════════════ BOOT LOG ══════════════ */
+#boot-log {
+  width: 100%;
+  background: rgba(0,0,0,.5);
+  border: 1px solid var(--dim);
+  border-radius: 1px;
+  padding: 12px 14px;
+  font-size: .65rem; line-height: 1.85;
+  height: 160px; overflow: hidden;
+  position: relative;
+}
+#boot-log::before {
+  content: '';
+  position: absolute; bottom: 0; left: 0; right: 0; height: 40px;
+  background: linear-gradient(transparent, rgba(0,0,0,.8));
+  pointer-events: none;
+}
+.bl { color: var(--muted); }
+.bl .ts { color: var(--dim); margin-right: 8px; }
+.bl.ok  .msg { color: var(--dgreen); }
+.bl.err .msg { color: var(--red); }
+.bl.inf .msg { color: var(--cyan); }
+.bl.wrn .msg { color: var(--orange); }
+.bl.sat .msg { color: #cc44ff; }
+.bl.hd  .msg { color: var(--yellow); font-weight: bold; }
+
+/* ══════════════ AUTH PANEL ══════════════ */
+#auth-panel {
+  width: 100%; display: flex; flex-direction: column; gap: 14px;
+}
+
+.auth-row {
+  display: flex; align-items: center; gap: 12px;
+  font-size: .68rem;
+}
+.auth-label {
+  width: 120px; color: var(--muted); flex-shrink: 0; letter-spacing: 1px;
+}
+.auth-field {
+  flex: 1; position: relative;
+}
+.auth-bar {
+  height: 5px; background: var(--dim); border-radius: 1px; overflow: hidden;
+  position: relative;
+}
+.auth-fill {
+  height: 100%; border-radius: 1px;
+  transition: width .05s linear;
+}
+.auth-val {
+  position: absolute; right: 0; top: -14px;
+  font-size: .6rem; color: var(--dgreen); letter-spacing: 1px;
+}
+.auth-status {
+  width: 70px; text-align: right; font-size: .62rem;
+  flex-shrink: 0;
+}
+.auth-status.pending { color: var(--yellow); }
+.auth-status.ok      { color: var(--dgreen); }
+.auth-status.scan    { color: var(--cyan); }
+
+/* ══════════════ PROGRESS BAR ══════════════ */
+#progress-wrap {
+  width: 100%; display: flex; flex-direction: column; gap: 6px;
+}
+#progress-label {
+  font-size: .6rem; letter-spacing: 2px; color: var(--muted);
+  display: flex; justify-content: space-between;
+}
+#progress-track {
+  height: 8px; background: var(--dim); border-radius: 1px;
+  overflow: hidden; border: 1px solid rgba(0,255,65,.1);
+  position: relative;
+}
+#progress-fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--dgreen), var(--green), var(--cyan));
+  box-shadow: 0 0 8px var(--green);
+  transition: width .06s linear;
+  position: relative;
+}
+#progress-fill::after {
+  content: '';
+  position: absolute; top: 0; right: 0; bottom: 0; width: 20px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.3));
+}
+#progress-pct {
+  font-size: .65rem; color: var(--green); text-align: right;
+  font-family: 'Orbitron', monospace; font-weight: 700;
+}
+
+/* ══════════════ ENTER BUTTON ══════════════ */
+#enter-btn {
+  display: none;
+  padding: 14px 60px;
+  background: transparent;
+  border: 1px solid var(--green);
+  color: var(--green);
+  font-family: 'Orbitron', monospace;
+  font-size: .9rem;
+  font-weight: 700;
+  letter-spacing: 6px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  text-transform: uppercase;
+  transition: all .2s;
+  animation: btnGlow 2s ease-in-out infinite;
+}
+#enter-btn::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(0,255,65,.08) 50%, transparent 100%);
+  transform: translateX(-100%);
+  transition: transform .4s;
+}
+#enter-btn:hover {
+  background: rgba(0,255,65,.08);
+  box-shadow: 0 0 30px rgba(0,255,65,.4), inset 0 0 20px rgba(0,255,65,.05);
+  color: #fff;
+  text-shadow: 0 0 10px var(--green);
+}
+#enter-btn:hover::before { transform: translateX(100%); }
+#enter-btn:active { transform: scale(.98); }
+@keyframes btnGlow {
+  0%,100% { box-shadow: 0 0 10px rgba(0,255,65,.3); }
+  50%      { box-shadow: 0 0 22px rgba(0,255,65,.6), 0 0 4px var(--green) inset; }
+}
+
+/* ══════════════ WARNING STRIP ══════════════ */
+#warning-strip {
+  font-size: .55rem; letter-spacing: 1.5px; color: var(--dim);
+  text-align: center; line-height: 1.6;
+}
+#warning-strip span { color: var(--red); }
+
+/* ══════════════ TRANSITION FLASH ══════════════ */
+#flash {
+  position: fixed; inset: 0; z-index: 99999;
+  background: var(--green);
+  opacity: 0; pointer-events: none;
+}
+
+/* ══════════════ GLITCH ANIM ══════════════ */
+@keyframes glitchH {
+  0%   { transform: translate(0); opacity: 1; }
+  20%  { transform: translate(-4px, 1px); }
+  40%  { transform: translate(4px, -1px); }
+  60%  { transform: translate(-2px, 2px); clip-path: inset(30% 0 50% 0); }
+  80%  { transform: translate(2px); }
+  100% { transform: translate(0); opacity: 0; }
+}
+
+#scan-line {
+  position: fixed; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,.6), transparent);
+  z-index: 9997; pointer-events: none;
+  animation: scanMove 4s linear infinite;
+  box-shadow: 0 0 8px rgba(0,255,65,.4);
+}
+@keyframes scanMove {
+  from { top: -2px; opacity: .7; }
+  to   { top: 100vh; opacity: .2; }
+}
+</style>
+</head>
+<body>
+
+<!-- Scan line -->
+<div id="scan-line"></div>
+
+<!-- Transition flash -->
+<div id="flash"></div>
+
+<!-- Background canvas -->
+<canvas id="bg-canvas"></canvas>
+
+<!-- Glitch overlay -->
+<div id="glitch-overlay"></div>
+
+<!-- Ticker -->
+<div id="ticker-bar">
+  <div id="ticker-track">
+    <span class="g">● SYS:ONLINE</span>
+    <span class="c">▸ DOMENET-v4.1.7 SECURE SHELL</span>
+    <span class="r">⚠ UNAUTHORIZED ACCESS IS STRICTLY PROHIBITED</span>
+    <span class="y">▸ ENCRYPTION: AES-256-GCM</span>
+    <span class="g">● 8 SAT AKTIF</span>
+    <span class="c">▸ NODE: 24 TERKONEKSI</span>
+    <span class="g">● FIREWALL: AKTIF</span>
+    <span class="r">▸ IDS/IPS: SCANNING...</span>
+    <span class="y">▸ CERT: VALID — RSA-4096</span>
+    <!-- duplicate for seamless loop -->
+    <span class="g">● SYS:ONLINE</span>
+    <span class="c">▸ DOMENET-v4.1.7 SECURE SHELL</span>
+    <span class="r">⚠ UNAUTHORIZED ACCESS IS STRICTLY PROHIBITED</span>
+    <span class="y">▸ ENCRYPTION: AES-256-GCM</span>
+    <span class="g">● 8 SAT AKTIF</span>
+    <span class="c">▸ NODE: 24 TERKONEKSI</span>
+    <span class="g">● FIREWALL: AKTIF</span>
+    <span class="r">▸ IDS/IPS: SCANNING...</span>
+    <span class="y">▸ CERT: VALID — RSA-4096</span>
+  </div>
+</div>
+
+<!-- Corner brackets -->
+<div class="corner tl"><svg viewBox="0 0 40 40" fill="none" stroke="#00a828" stroke-width="1.5"><path d="M0 20 L0 0 L20 0"/></svg></div>
+<div class="corner tr"><svg viewBox="0 0 40 40" fill="none" stroke="#00a828" stroke-width="1.5"><path d="M0 20 L0 0 L20 0"/></svg></div>
+<div class="corner bl"><svg viewBox="0 0 40 40" fill="none" stroke="#00a828" stroke-width="1.5"><path d="M0 20 L0 0 L20 0"/></svg></div>
+<div class="corner br"><svg viewBox="0 0 40 40" fill="none" stroke="#00a828" stroke-width="1.5"><path d="M0 20 L0 0 L20 0"/></svg></div>
+
+<!-- Status bar -->
+<div id="status-bar">
+  <div class="seg">
+    <div class="sb-item"><div class="sb-dot"></div>SYSTEM ONLINE</div>
+    <div class="sb-item"><div class="sb-dot y"></div>SCANNING NETWORK</div>
+    <div class="sb-item"><div class="sb-dot r"></div><span id="sb-threats">0 THREATS</span></div>
+  </div>
+  <div class="seg">
+    <div class="sb-item">ENC: AES-256</div>
+    <div class="sb-item">VPN: ACTIVE</div>
+    <div id="sb-time">--:--:--</div>
+  </div>
+</div>
+
+<!-- Main wrapper -->
+<div id="wrapper">
+
+  <!-- Globe -->
+  <div id="globe-ring">
+    <canvas id="globe-canvas" width="320" height="320"></canvas>
+  </div>
+
+  <!-- Card -->
+  <div id="card">
+    <div class="card-corner tl"></div>
+    <div class="card-corner tr"></div>
+    <div class="card-corner bl"></div>
+    <div class="card-corner br"></div>
+
+    <div id="logo">DOME<span>NET</span></div>
+    <div id="logo-sub">Surveillance &amp; Intrusion Detection System</div>
+
+    <div class="divider"></div>
+
+    <!-- Boot log -->
+    <div id="boot-log"></div>
+
+    <div class="divider"></div>
+
+    <!-- Auth bars -->
+    <div id="auth-panel">
+      <div class="auth-row">
+        <div class="auth-label">IDENTITY</div>
+        <div class="auth-field">
+          <div class="auth-bar"><div class="auth-fill" id="af-id" style="background:#00ff41;width:0%"></div></div>
+          <div class="auth-val" id="av-id">0%</div>
+        </div>
+        <div class="auth-status pending" id="as-id">PENDING</div>
+      </div>
+      <div class="auth-row">
+        <div class="auth-label">CERT CHECK</div>
+        <div class="auth-field">
+          <div class="auth-bar"><div class="auth-fill" id="af-ct" style="background:#00ffff;width:0%"></div></div>
+          <div class="auth-val" id="av-ct">0%</div>
+        </div>
+        <div class="auth-status scan" id="as-ct">WAITING</div>
+      </div>
+      <div class="auth-row">
+        <div class="auth-label">FIREWALL</div>
+        <div class="auth-field">
+          <div class="auth-bar"><div class="auth-fill" id="af-fw" style="background:#ffff00;width:0%"></div></div>
+          <div class="auth-val" id="av-fw">0%</div>
+        </div>
+        <div class="auth-status scan" id="as-fw">WAITING</div>
+      </div>
+      <div class="auth-row">
+        <div class="auth-label">ENCRYPTION</div>
+        <div class="auth-field">
+          <div class="auth-bar"><div class="auth-fill" id="af-en" style="background:#cc44ff;width:0%"></div></div>
+          <div class="auth-val" id="av-en">0%</div>
+        </div>
+        <div class="auth-status scan" id="as-en">WAITING</div>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div id="progress-wrap">
+      <div id="progress-label">
+        <span id="prog-txt">INITIALIZING SECURE TUNNEL...</span>
+        <span id="progress-pct">0%</span>
+      </div>
+      <div id="progress-track">
+        <div id="progress-fill"></div>
+      </div>
+    </div>
+
+    <!-- Enter button -->
+    <button id="enter-btn" onclick="launchDome()">▶ AKSES DOME NETWORK</button>
+
+    <div id="warning-strip">
+      <span>⚠ PERINGATAN:</span> SISTEM INI HANYA UNTUK PERSONEL YANG BERWENANG.<br>
+      SEMUA AKSES DIREKAM DAN DIPANTAU. PELANGGARAN AKAN DITUNTUT SECARA HUKUM.
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════
+   CLOCK
+══════════════════════════════════════════════════════ */
+function updateClock() {
+  document.getElementById('sb-time').textContent =
+    new Date().toTimeString().slice(0, 8) + ' UTC';
+}
+updateClock();
+setInterval(updateClock, 1000);
+
+/* ══════════════════════════════════════════════════════
+   BACKGROUND — MATRIX RAIN + GRID
+══════════════════════════════════════════════════════ */
+const bgC = document.getElementById('bg-canvas');
+const bgX = bgC.getContext('2d');
+const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*<>?/|[]{}∑∏∇⊗⊕';
+let cols, drops, fontSize = 11;
+
+function resizeBg() {
+  bgC.width = window.innerWidth;
+  bgC.height = window.innerHeight;
+  cols = Math.floor(bgC.width / fontSize);
+  drops = new Array(cols).fill(1);
+}
+resizeBg();
+window.addEventListener('resize', resizeBg);
+
+function drawBg() {
+  bgX.fillStyle = 'rgba(1,10,1,0.10)';
+  bgX.fillRect(0, 0, bgC.width, bgC.height);
+
+  bgX.font = fontSize + 'px Share Tech Mono';
+  for (let i = 0; i < drops.length; i++) {
+    const ch = CHARS[Math.floor(Math.random() * CHARS.length)];
+    const alpha = Math.random() * 0.15 + 0.02;
+    bgX.fillStyle = `rgba(0,80,20,${alpha})`;
+    bgX.fillText(ch, i * fontSize, drops[i] * fontSize);
+    if (drops[i] * fontSize > bgC.height && Math.random() > 0.975) drops[i] = 0;
+    drops[i]++;
+  }
+
+  // horizontal grid lines
+  bgX.strokeStyle = 'rgba(0,60,0,0.07)';
+  bgX.lineWidth = 1;
+  for (let y = 0; y < bgC.height; y += 40) {
+    bgX.beginPath(); bgX.moveTo(0, y); bgX.lineTo(bgC.width, y); bgX.stroke();
+  }
+}
+setInterval(drawBg, 55);
+
+/* ══════════════════════════════════════════════════════
+   GLOBE CANVAS
+══════════════════════════════════════════════════════ */
+const gc = document.getElementById('globe-canvas');
+const gx = gc.getContext('2d');
+let GT = 0;
+
+function drawGlobe() {
+  GT += 0.008;
+  const W = gc.width, H = gc.height;
+  const cx = W / 2, cy = H / 2, R = W * 0.42;
+
+  gx.clearRect(0, 0, W, H);
+
+  // outer glow ring
+  const outerGlow = gx.createRadialGradient(cx, cy, R * 0.85, cx, cy, R * 1.25);
+  outerGlow.addColorStop(0, 'rgba(0,255,65,0.07)');
+  outerGlow.addColorStop(1, 'transparent');
+  gx.fillStyle = outerGlow;
+  gx.fillRect(0, 0, W, H);
+
+  // rotating meridians (longitude lines)
+  for (let m = 0; m < 10; m++) {
+    const ang = GT + (m / 10) * Math.PI;
+    const cosA = Math.cos(ang);
+    gx.beginPath();
+    for (let lat = 0; lat <= 60; lat++) {
+      const phi = (lat / 60) * Math.PI - Math.PI / 2;
+      const x = cx + R * cosA * Math.cos(phi);
+      const y = cy + R * Math.sin(phi);
+      lat === 0 ? gx.moveTo(x, y) : gx.lineTo(x, y);
+    }
+    const alpha = Math.abs(cosA) * 0.25 + 0.04;
+    gx.strokeStyle = `rgba(0,200,60,${alpha})`;
+    gx.lineWidth = 0.8;
+    gx.stroke();
+  }
+
+  // static parallels (latitude)
+  for (let lat = 1; lat < 6; lat++) {
+    const phi = (lat / 6) * Math.PI - Math.PI / 2;
+    const ry = R * Math.cos(phi);
+    const y  = cy + R * Math.sin(phi);
+    gx.beginPath();
+    gx.ellipse(cx, y, ry, ry * 0.22, 0, 0, Math.PI * 2);
+    gx.strokeStyle = `rgba(0,180,60,${0.08 + lat * 0.02})`;
+    gx.lineWidth = 0.7;
+    gx.stroke();
+  }
+
+  // equator bold
+  gx.beginPath();
+  gx.ellipse(cx, cy, R, R * 0.22, 0, 0, Math.PI * 2);
+  gx.strokeStyle = 'rgba(0,255,65,0.25)';
+  gx.lineWidth = 1.2;
+  gx.stroke();
+
+  // outer ring
+  gx.beginPath(); gx.arc(cx, cy, R, 0, Math.PI * 2);
+  gx.strokeStyle = 'rgba(0,255,65,0.18)';
+  gx.lineWidth = 1;
+  gx.stroke();
+
+  // orbit ring
+  const orbitR = R * 1.18;
+  gx.beginPath();
+  gx.ellipse(cx, cy, orbitR, orbitR * 0.28, GT * 0.3, 0, Math.PI * 2);
+  gx.strokeStyle = 'rgba(0,200,255,0.15)';
+  gx.lineWidth = 1;
+  gx.setLineDash([4, 8]);
+  gx.stroke();
+  gx.setLineDash([]);
+
+  // satellite on orbit
+  const satA = GT * 1.4;
+  const orbitRx = orbitR, orbitRy = orbitR * 0.28;
+  const sinTilt = Math.sin(GT * 0.3), cosTilt = Math.cos(GT * 0.3);
+  const ex = orbitRx * Math.cos(satA);
+  const ey = orbitRy * Math.sin(satA);
+  const sx = cx + ex * cosTilt - ey * sinTilt;
+  const sy = cy + ex * sinTilt + ey * cosTilt;
+  gx.beginPath(); gx.arc(sx, sy, 4, 0, Math.PI * 2);
+  gx.fillStyle = '#00ffff';
+  gx.shadowColor = '#00ffff'; gx.shadowBlur = 10;
+  gx.fill(); gx.shadowBlur = 0;
+
+  // signal beam from satellite to globe
+  gx.beginPath(); gx.moveTo(sx, sy); gx.lineTo(cx, cy);
+  const beam = gx.createLinearGradient(sx, sy, cx, cy);
+  beam.addColorStop(0, 'rgba(0,255,255,0.4)');
+  beam.addColorStop(1, 'rgba(0,255,255,0)');
+  gx.strokeStyle = beam; gx.lineWidth = 0.8; gx.stroke();
+
+  // network dots on globe
+  const dotAngles = [0.5, 1.8, 3.2, 4.6, 5.9];
+  dotAngles.forEach((a, i) => {
+    const da = a + GT * (i % 2 === 0 ? 0.4 : -0.3);
+    const phi = ((i * 37) % 120 - 60) * (Math.PI / 180);
+    const dx = cx + R * Math.cos(da) * Math.cos(phi);
+    const dy = cy + R * Math.sin(phi);
+    const visible = Math.cos(da) > -0.1;
+    if (!visible) return;
+    const alpha = Math.cos(da) * 0.7 + 0.2;
+    const colors = ['#00ff41','#00ffff','#ffff00','#ff8c00','#cc44ff'];
+    gx.beginPath(); gx.arc(dx, dy, 3, 0, Math.PI * 2);
+    gx.fillStyle = colors[i];
+    gx.globalAlpha = alpha;
+    gx.shadowColor = colors[i]; gx.shadowBlur = 6;
+    gx.fill(); gx.shadowBlur = 0;
+    gx.globalAlpha = 1;
+  });
+
+  // core glow
+  const coreGlow = gx.createRadialGradient(cx, cy, 0, cx, cy, R * 0.35);
+  coreGlow.addColorStop(0, 'rgba(0,255,65,0.1)');
+  coreGlow.addColorStop(1, 'transparent');
+  gx.fillStyle = coreGlow;
+  gx.fillRect(0, 0, W, H);
+}
+setInterval(drawGlobe, 30);
+
+/* ══════════════════════════════════════════════════════
+   GLITCH EFFECT
+══════════════════════════════════════════════════════ */
+function triggerGlitch() {
+  const el = document.getElementById('glitch-overlay');
+  el.style.opacity = '1';
+  el.innerHTML = '';
+  const count = 4 + Math.floor(Math.random() * 5);
+  for (let i = 0; i < count; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'glitch-bar';
+    bar.style.top = (Math.random() * 100) + '%';
+    bar.style.height = (Math.random() * 8 + 2) + 'px';
+    bar.style.background = Math.random() < 0.3
+      ? 'rgba(0,255,255,0.06)'
+      : 'rgba(0,255,65,0.07)';
+    bar.style.transform = `translateX(${(Math.random() - 0.5) * 20}px)`;
+    el.appendChild(bar);
+  }
+  setTimeout(() => { el.style.opacity = '0'; el.innerHTML = ''; }, 140);
+}
+setInterval(triggerGlitch, 2800 + Math.random() * 1500);
+
+/* ══════════════════════════════════════════════════════
+   BOOT LOG
+══════════════════════════════════════════════════════ */
+const BOOT_LINES = [
+  { d: 0,    type: 'hd',  msg: '═══ DOMENET SECURE ACCESS PROTOCOL v4.1.7 ═══' },
+  { d: 200,  type: 'inf', msg: '[SYS] Menginisialisasi kernel pengawasan...' },
+  { d: 420,  type: 'ok',  msg: '[OK]  Modul kriptografi AES-256-GCM dimuat' },
+  { d: 680,  type: 'ok',  msg: '[OK]  Stack jaringan TCP/IP aktif' },
+  { d: 900,  type: 'inf', msg: '[NET] Menghubungkan ke relay satelit...' },
+  { d: 1150, type: 'sat', msg: '[SAT] SAT-ALPHA-01 lock acquired  1.57 GHz' },
+  { d: 1340, type: 'sat', msg: '[SAT] SAT-BETA-07  lock acquired  2.40 GHz' },
+  { d: 1540, type: 'sat', msg: '[SAT] SAT-GAMMA-12 lock acquired  5.80 GHz' },
+  { d: 1700, type: 'ok',  msg: '[OK]  8/8 satelit terhubung' },
+  { d: 1900, type: 'inf', msg: '[IDS] Memulai intrusion detection system...' },
+  { d: 2100, type: 'ok',  msg: '[OK]  Firewall perimeter aktif — 4096 rules loaded' },
+  { d: 2350, type: 'wrn', msg: '[IDS] Port scan terdeteksi dari 45.33.32.156 — diblokir' },
+  { d: 2600, type: 'ok',  msg: '[AUTH] Memverifikasi sertifikat TLS...' },
+  { d: 2900, type: 'ok',  msg: '[AUTH] cert.pem valid — CN=localhost, RSA-4096' },
+  { d: 3100, type: 'inf', msg: '[NET] Membangun tunnel VPN terenkripsi...' },
+  { d: 3450, type: 'ok',  msg: '[OK]  Tunnel VPN established — latency 12ms' },
+  { d: 3700, type: 'ok',  msg: '[CAM] 24 node aktif dalam dome network' },
+  { d: 4000, type: 'hd',  msg: '═══ SEMUA SISTEM OPERASIONAL ═══' },
+];
+
+const bootLog = document.getElementById('boot-log');
+BOOT_LINES.forEach(line => {
+  setTimeout(() => {
+    const ts = new Date().toTimeString().slice(0, 8);
+    const div = document.createElement('div');
+    div.className = 'bl ' + line.type;
+    div.innerHTML = `<span class="ts">${ts}</span><span class="msg">${line.msg}</span>`;
+    bootLog.appendChild(div);
+    bootLog.scrollTop = bootLog.scrollHeight;
+  }, line.d);
+});
+
+/* ══════════════════════════════════════════════════════
+   AUTH BARS ANIMATION
+══════════════════════════════════════════════════════ */
+const AUTH_STAGES = [
+  { fillId: 'af-id', valId: 'av-id', statId: 'as-id', label: 'VERIFIED', start: 500 },
+  { fillId: 'af-ct', valId: 'av-ct', statId: 'as-ct', label: 'VALID',    start: 1400 },
+  { fillId: 'af-fw', valId: 'av-fw', statId: 'as-fw', label: 'ACTIVE',   start: 2300 },
+  { fillId: 'af-en', valId: 'av-en', statId: 'as-en', label: 'AES-256',  start: 3200 },
+];
+
+AUTH_STAGES.forEach(stage => {
+  let pct = 0;
+  const el = document.getElementById(stage.statId);
+  el.textContent = 'SCANNING';
+  el.className = 'auth-status scan';
+
+  const interval = setInterval(() => {
+    pct = Math.min(100, pct + Math.random() * 6 + 2);
+    document.getElementById(stage.fillId).style.width = pct + '%';
+    document.getElementById(stage.valId).textContent = Math.floor(pct) + '%';
+    if (pct >= 100) {
+      clearInterval(interval);
+      el.textContent = stage.label;
+      el.className = 'auth-status ok';
+    }
+  }, 40);
+
+  // start with delay
+  const fill = document.getElementById(stage.fillId);
+  fill.style.width = '0%';
+  setTimeout(() => { /* interval already set */ }, stage.start);
+});
+
+// stagger start
+AUTH_STAGES.forEach((stage, i) => {
+  document.getElementById(stage.fillId).style.width = '0%';
+  document.getElementById(stage.statId).textContent = 'WAITING';
+  document.getElementById(stage.statId).className = 'auth-status pending';
+  // reset and re-run with delay
+  let started = false;
+  const check = setInterval(() => {}, 999999); // placeholder
+  clearInterval(check);
+});
+
+// Properly staggered auth
+AUTH_STAGES.forEach((stage, i) => {
+  const fill   = document.getElementById(stage.fillId);
+  const valEl  = document.getElementById(stage.valId);
+  const statEl = document.getElementById(stage.statId);
+  fill.style.width = '0%';
+  valEl.textContent = '0%';
+  statEl.textContent = 'WAITING';
+  statEl.className = 'auth-status pending';
+
+  setTimeout(() => {
+    statEl.textContent = 'SCANNING';
+    statEl.className = 'auth-status scan';
+    let pct = 0;
+    const iv = setInterval(() => {
+      pct = Math.min(100, pct + Math.random() * 5 + 2);
+      fill.style.width = pct + '%';
+      valEl.textContent = Math.floor(pct) + '%';
+      if (pct >= 100) {
+        clearInterval(iv);
+        statEl.textContent = stage.label;
+        statEl.className = 'auth-status ok';
+      }
+    }, 40);
+  }, stage.start);
+});
+
+/* ══════════════════════════════════════════════════════
+   MAIN PROGRESS BAR
+══════════════════════════════════════════════════════ */
+const PROG_LABELS = [
+  [0,   'INITIALIZING SECURE TUNNEL...'],
+  [18,  'VALIDATING CERTIFICATES...'],
+  [34,  'HANDSHAKING WITH DOME CORE...'],
+  [52,  'LOADING SATELLITE MAP...'],
+  [68,  'SYNCING NETWORK NODES...'],
+  [82,  'ACTIVATING IDS/IPS ENGINE...'],
+  [94,  'FINALIZING ACCESS GRANT...'],
+  [100, 'ACCESS GRANTED — WELCOME OPERATOR'],
+];
+
+let progPct = 0;
+const progFill  = document.getElementById('progress-fill');
+const progPctEl = document.getElementById('progress-pct');
+const progTxtEl = document.getElementById('prog-txt');
+const enterBtn  = document.getElementById('enter-btn');
+
+const progIv = setInterval(() => {
+  progPct = Math.min(100, progPct + Math.random() * 1.2 + 0.4);
+  progFill.style.width = progPct + '%';
+  progPctEl.textContent = Math.floor(progPct) + '%';
+
+  // update label
+  for (let i = PROG_LABELS.length - 1; i >= 0; i--) {
+    if (progPct >= PROG_LABELS[i][0]) {
+      progTxtEl.textContent = PROG_LABELS[i][1];
+      break;
+    }
+  }
+
+  if (progPct >= 100) {
+    clearInterval(progIv);
+    progPctEl.textContent = '100%';
+    setTimeout(() => {
+      enterBtn.style.display = 'block';
+      // fade in
+      enterBtn.style.opacity = '0';
+      enterBtn.style.transition = 'opacity .6s';
+      setTimeout(() => { enterBtn.style.opacity = '1'; }, 50);
+    }, 400);
+  }
+}, 38);
+
+/* ══════════════════════════════════════════════════════
+   THREATS COUNTER
+══════════════════════════════════════════════════════ */
+let threatCnt = 0;
+setInterval(() => {
+  if (Math.random() < 0.15) {
+    threatCnt++;
+    document.getElementById('sb-threats').textContent = threatCnt + ' THREATS';
+  }
+}, 3000);
+
+/* ══════════════════════════════════════════════════════
+   LAUNCH — TRANSITION TO DOME NETWORK
+══════════════════════════════════════════════════════ */
+function launchDome() {
+  const btn = document.getElementById('enter-btn');
+  btn.disabled = true;
+  btn.textContent = '◼ MEMBUKA SECURE CHANNEL...';
+
+  // glitch burst
+  let gc2 = 0;
+  const glitchBurst = setInterval(() => {
+    triggerGlitch();
+    gc2++;
+    if (gc2 > 6) clearInterval(glitchBurst);
+  }, 120);
+
+  // flash and navigate
+  setTimeout(() => {
+    const flash = document.getElementById('flash');
+    flash.style.transition = 'opacity .25s';
+    flash.style.opacity = '0.9';
+    setTimeout(() => {
+      // ── Ganti URL ini ke dome_network.html atau nama file tujuan ──
+      window.location.href = '1/public/dome-network.html';
+    }, 300);
+  }, 800);
+}
+</script>
+</body>
+</html>
